@@ -2,6 +2,8 @@
 
 Automated playlist file routing and management system for broadcast automation. Supports WOS, SCH, and SCD file formats with configurable routing to station-specific folders.
 
+Includes **Media Checker** - a validation tool that indexes media files and checks WOS playlists for missing media references.
+
 ## Features
 
 - **Automated File Processing**: Monitors import folder and routes files based on configurable prefix mappings
@@ -32,6 +34,19 @@ Flask web application for management and configuration.
 - Manage allowed file types (WOS, SCH, SCD, etc.)
 - Update directory paths
 - View log files
+
+### 3. Media Checker (media_checker.py + media_checker_web.py)
+Validates that all media referenced in WOS playlists actually exists in the media library.
+
+**Features:**
+- Indexes all media files from `/mnt/mc_media`
+- Parses WOS files to extract media references
+- Identifies missing media files
+- Web interface at `http://localhost:5001`
+- Export results as CSV or JSON
+- Refresh capability to verify if missing media has been added
+
+**See [MEDIA_CHECKER_README.md](MEDIA_CHECKER_README.md) for detailed documentation.**
 
 ## Installation
 
@@ -66,6 +81,22 @@ python web_interface.py
 Access the web interface at: `http://localhost:5000`
 
 For remote access: `http://your-server-ip:5000`
+
+### Running the Media Checker
+
+```bash
+python media_checker_web.py
+```
+
+Access the media checker at: `http://localhost:5001`
+
+**Quick Start:**
+1. Open http://localhost:5001 in your browser
+2. Click "Run Check" to scan WOS files and validate media
+3. View missing media files and export reports
+4. Click "Run Check" again after adding missing media to verify
+
+See [MEDIA_CHECKER_README.md](MEDIA_CHECKER_README.md) for complete documentation.
 
 ## Configuration
 

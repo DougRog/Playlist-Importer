@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Checker - WOS Playlist Validator</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem 0;
+        }
+        .card {
+            border: none;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            border-radius: 15px;
+        }
+        .stat-card {
+            transition: transform 0.2s;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        .missing-media-item {
+            border-left: 4px solid #dc3545;
+            transition: all 0.2s;
+        }
+        .missing-media-item:hover {
+            background-color: #f8f9fa;
+            border-left-color: #c82333;
+        }
+        .badge-large {
+            font-size: 2rem;
+            padding: 0.5rem 1rem;
+        }
+        .spinner-border-lg {
+            width: 3rem;
+            height: 3rem;
+        }
+        .wos-file-badge {
+            font-size: 0.7rem;
+            margin: 2px;
+        }
+        .refresh-btn {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(13, 110, 253, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(13, 110, 253, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(13, 110, 253, 0); }
+        }
+        .media-name {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: #dc3545;
+        }
+        #loadingOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 9999;
+            display: none;
+        }
+        .no-results {
+            opacity: 0.7;
+        }
+        .success-banner {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+        }
+        .filter-input {
+            border-radius: 25px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="d-flex align-items-center justify-content-center">
+        <div class="text-center">
+            <div class="spinner-border text-light spinner-border-lg mb-3" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <h3 class="text-white">Checking Media Files...</h3>
+            <p class="text-white-50">This may take a few moments</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12 text-center">
+                <h1 class="text-white display-4">
+                    <i class="bi bi-film"></i> Media Checker
+                </h1>
+                <p class="text-white-50 lead">WOS Playlist Media Validator</p>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="row mb-4">
+            <div class="col-12 text-center">
+                <button id="runCheckBtn" class="btn btn-primary btn-lg me-2 refresh-btn" onclick="runCheck()">
+                    <i class="bi bi-arrow-clockwise"></i> Run Check
+                </button>
+                <button class="btn btn-outline-light btn-lg me-2" onclick="loadResults()">
+                    <i class="bi bi-download"></i> Refresh Results
+                </button>
+                <button id="exportCsvBtn" class="btn btn-success btn-lg me-2" onclick="exportCSV()" disabled>
+                    <i class="bi bi-file-earmark-spreadsheet"></i> Export CSV
+                </button>
+                <button id="exportJsonBtn" class="btn btn-info btn-lg" onclick="exportJSON()" disabled>
+                    <i class="bi bi-file-earmark-code"></i> Export JSON
+                </button>
+            </div>
+        </div>
+
+        <!-- Status Cards -->
+        <div id="statsSection" class="row g-4 mb-4" style="display: none;">
+            <div class="col-md-3">
+                <div class="card stat-card h-100">
+                    <div class="card-body text-center">
+                        <i class="bi bi-hdd-stack text-primary" style="font-size: 2rem;"></i>
+                        <h3 class="mt-2" id="mediaFilesCount">-</h3>
+                        <p class="text-muted mb-0">Media Files Indexed</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card h-100">
+                    <div class="card-body text-center">
+                        <i class="bi bi-file-earmark-music text-info" style="font-size: 2rem;"></i>
+                        <h3 class="mt-2" id="wosFilesCount">-</h3>
+                        <p class="text-muted mb-0">WOS Files Checked</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card h-100">
+                    <div class="card-body text-center">
+                        <i class="bi bi-link text-warning" style="font-size: 2rem;"></i>
+                        <h3 class="mt-2" id="referencesCount">-</h3>
+                        <p class="text-muted mb-0">Media References</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card h-100">
+                    <div class="card-body text-center">
+                        <i class="bi bi-exclamation-triangle text-danger" style="font-size: 2rem;"></i>
+                        <h3 class="mt-2 text-danger" id="missingCount">-</h3>
+                        <p class="text-muted mb-0">Missing Media</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Last Check Time -->
+        <div id="checkTimeSection" class="row mb-4" style="display: none;">
+            <div class="col-12">
+                <div class="alert alert-info text-center mb-0">
+                    <i class="bi bi-clock"></i> Last checked: <strong id="checkTime">-</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Success Message (when no missing media) -->
+        <div id="successSection" class="row mb-4" style="display: none;">
+            <div class="col-12">
+                <div class="success-banner text-center">
+                    <h3><i class="bi bi-check-circle"></i> All Media Files Found!</h3>
+                    <p class="mb-0">All media referenced in WOS files is present in the media library.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Missing Media Section -->
+        <div id="missingSection" class="row" style="display: none;">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-exclamation-triangle"></i> Missing Media Files
+                            <span id="missingBadge" class="badge bg-light text-danger float-end">0</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Filter -->
+                        <div class="mb-3">
+                            <input type="text" id="filterInput" class="form-control filter-input"
+                                   placeholder="🔍 Filter media files..." onkeyup="filterResults()">
+                        </div>
+
+                        <!-- View Toggle -->
+                        <div class="btn-group mb-3" role="group">
+                            <button type="button" class="btn btn-outline-primary active" id="viewByMediaBtn" onclick="setView('media')">
+                                <i class="bi bi-file-earmark"></i> View by Media
+                            </button>
+                            <button type="button" class="btn btn-outline-primary" id="viewByWOSBtn" onclick="setView('wos')">
+                                <i class="bi bi-list-ul"></i> View by WOS File
+                            </button>
+                        </div>
+
+                        <!-- Results Container -->
+                        <div id="resultsContainer" style="max-height: 600px; overflow-y: auto;">
+                            <div id="missingMediaList"></div>
+                            <div id="missingByWOSList" style="display: none;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Initial State Message -->
+        <div id="initialMessage" class="row">
+            <div class="col-12">
+                <div class="card text-center no-results">
+                    <div class="card-body py-5">
+                        <i class="bi bi-info-circle" style="font-size: 4rem; color: #6c757d;"></i>
+                        <h3 class="mt-3">No Results Yet</h3>
+                        <p class="text-muted">Click "Run Check" to scan WOS files and validate media references</p>
+                        <button class="btn btn-primary btn-lg mt-3" onclick="runCheck()">
+                            <i class="bi bi-arrow-clockwise"></i> Run First Check
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentView = 'media';
+        let currentResults = null;
+
+        // Run a new check
+        function runCheck() {
+            document.getElementById('loadingOverlay').style.display = 'flex';
+            document.getElementById('runCheckBtn').disabled = true;
+
+            fetch('/api/check', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('loadingOverlay').style.display = 'none';
+                document.getElementById('runCheckBtn').disabled = false;
+
+                if (data.success) {
+                    displayResults(data.results);
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                document.getElementById('loadingOverlay').style.display = 'none';
+                document.getElementById('runCheckBtn').disabled = false;
+                alert('Error running check: ' + error);
+            });
+        }
+
+        // Load existing results
+        function loadResults() {
+            fetch('/api/results')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displayResults(data.results);
+                } else {
+                    alert(data.message || 'No results available');
+                }
+            })
+            .catch(error => alert('Error loading results: ' + error));
+        }
+
+        // Display results
+        function displayResults(results) {
+            currentResults = results;
+
+            // Hide initial message
+            document.getElementById('initialMessage').style.display = 'none';
+
+            // Show stats
+            document.getElementById('statsSection').style.display = 'flex';
+            document.getElementById('checkTimeSection').style.display = 'block';
+
+            // Update stats
+            document.getElementById('mediaFilesCount').textContent = results.index_stats.unique_names.toLocaleString();
+            document.getElementById('wosFilesCount').textContent = results.validation_results.wos_files_checked.toLocaleString();
+            document.getElementById('referencesCount').textContent = results.validation_results.total_references.toLocaleString();
+            document.getElementById('missingCount').textContent = results.validation_results.missing_count.toLocaleString();
+            document.getElementById('checkTime').textContent = results.validation_results.check_time;
+            document.getElementById('missingBadge').textContent = results.validation_results.missing_count;
+
+            // Enable export buttons
+            document.getElementById('exportCsvBtn').disabled = false;
+            document.getElementById('exportJsonBtn').disabled = false;
+
+            // Show appropriate section
+            if (results.validation_results.missing_count === 0) {
+                document.getElementById('successSection').style.display = 'block';
+                document.getElementById('missingSection').style.display = 'none';
+            } else {
+                document.getElementById('successSection').style.display = 'none';
+                document.getElementById('missingSection').style.display = 'block';
+                displayMissingMedia(results.validation_results);
+            }
+        }
+
+        // Display missing media
+        function displayMissingMedia(results) {
+            // By Media view
+            let mediaHtml = '';
+            results.missing_media.forEach(item => {
+                let wosFilesHtml = item.referenced_in.map(ref =>
+                    `<span class="badge bg-secondary wos-file-badge" title="${ref.wos_folder}">${ref.wos_file}</span>`
+                ).join(' ');
+
+                mediaHtml += `
+                    <div class="missing-media-item p-3 mb-2 border rounded" data-media-name="${item.media_name.toLowerCase()}">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <h6 class="media-name mb-2">${item.media_name}</h6>
+                                <div class="mb-2">
+                                    <span class="badge bg-danger">${item.reference_count} reference(s)</span>
+                                </div>
+                                <div class="small">
+                                    <strong>Referenced in:</strong><br>
+                                    ${wosFilesHtml}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('missingMediaList').innerHTML = mediaHtml || '<p class="text-muted">No missing media</p>';
+
+            // By WOS view
+            let wosHtml = '';
+            const byWOS = results.missing_by_wos;
+            Object.keys(byWOS).sort().forEach(wosFile => {
+                const mediaFiles = byWOS[wosFile];
+                wosHtml += `
+                    <div class="missing-media-item p-3 mb-2 border rounded" data-wos-name="${wosFile.toLowerCase()}">
+                        <h6 class="mb-2">
+                            <i class="bi bi-file-earmark-music"></i> ${wosFile}
+                            <span class="badge bg-danger ms-2">${mediaFiles.length} missing</span>
+                        </h6>
+                        <div class="small">
+                            ${mediaFiles.map(m => `<span class="badge bg-secondary me-1 mb-1">${m}</span>`).join('')}
+                        </div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('missingByWOSList').innerHTML = wosHtml || '<p class="text-muted">No missing media</p>';
+        }
+
+        // Toggle view
+        function setView(view) {
+            currentView = view;
+
+            if (view === 'media') {
+                document.getElementById('missingMediaList').style.display = 'block';
+                document.getElementById('missingByWOSList').style.display = 'none';
+                document.getElementById('viewByMediaBtn').classList.add('active');
+                document.getElementById('viewByWOSBtn').classList.remove('active');
+            } else {
+                document.getElementById('missingMediaList').style.display = 'none';
+                document.getElementById('missingByWOSList').style.display = 'block';
+                document.getElementById('viewByMediaBtn').classList.remove('active');
+                document.getElementById('viewByWOSBtn').classList.add('active');
+            }
+        }
+
+        // Filter results
+        function filterResults() {
+            const filter = document.getElementById('filterInput').value.toLowerCase();
+            const items = document.querySelectorAll('.missing-media-item');
+
+            items.forEach(item => {
+                const mediaName = item.getAttribute('data-media-name') || item.getAttribute('data-wos-name') || '';
+                if (mediaName.includes(filter) || item.textContent.toLowerCase().includes(filter)) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+
+        // Export functions
+        function exportCSV() {
+            window.location.href = '/export/csv';
+        }
+
+        function exportJSON() {
+            window.location.href = '/export/json';
+        }
+
+        // Auto-load results on page load
+        window.addEventListener('load', function() {
+            loadResults();
+        });
+    </script>
+</body>
+</html>
