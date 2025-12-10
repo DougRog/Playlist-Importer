@@ -1,0 +1,35 @@
+{
+    "directories": {
+        "import_folder": "/mnt/playlists/Import",
+        "archive_folder": "/mnt/playlists/Archive",
+        "final_destination_root": "/mnt/playlists",
+        "log_folder": "/home/lilly/Logs"
+    },
+    "email": {
+        "to": "drogers@lillybroadcasting.com",
+        "from": "mib@lillyhubtv.com",
+        "password": "N0t1fy!@!",
+        "smtp_server": "smtp-legacy.office365.com",
+        "smtp_port": 587
+    },
+    "allowed_file_types": ["WOS", "SCH", "SCD"],
+    "folder_mappings": {
+        "FOX6": "FOX 6",
+        "WENY": "WENY ABC",
+        "ABC7": "ABC 7",
+        "EENY": "WENY CBS",
+        "SEE": "SEE CBS",
+        "WCVI": "WCVI CBS",
+        "EZMQ": "WZMQ CBS",
+        "WSEE": "WSEE CBS",
+        "WICU": "WICU NBC",
+        "OCTV": "OCTV",
+        "ENNPLUS": "ENN+",
+        "ECVI": "WCVI ABC",
+        "WSJP": "WSJP FOX",
+        "WVXF": "WVXF FOX",
+        "WVGN": "WVGN NBC",
+        "GENY": "WENY CW",
+        "NYLOCAL": "NY Local"
+    }
+}

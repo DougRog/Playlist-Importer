@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+
+{% block title %}Configuration - Playlist Importer{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="text-white"><i class="bi bi-gear"></i> Configuration</h1>
+        <p class="text-white-50">Manage folder mappings, file types, and directories</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- File Types Configuration -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-file-earmark-check"></i> Allowed File Types</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Select which file extensions should be processed by the importer.</p>
+
+                <div id="fileTypesList" class="mb-3">
+                    {% for file_type in config.allowed_file_types %}
+                        <div class="badge bg-primary me-2 mb-2 fs-6 p-2">
+                            .{{ file_type }}
+                            <button type="button" class="btn-close btn-close-white ms-2" style="font-size: 0.6rem;" onclick="removeFileType('{{ file_type }}')"></button>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <div class="input-group">
+                    <input type="text" class="form-control" id="newFileType" placeholder="e.g., WOS, SCH, SCD" maxlength="4">
+                    <button class="btn btn-primary" onclick="addFileType()">
+                        <i class="bi bi-plus-circle"></i> Add
+                    </button>
+                </div>
+
+                <button class="btn btn-success w-100 mt-3" onclick="saveFileTypes()">
+                    <i class="bi bi-save"></i> Save File Types
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Folder Mappings Configuration -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-folder2"></i> Folder Mappings</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Map filename prefixes to destination folders.</p>
+
+                <div id="folderMappingsList" style="max-height: 300px; overflow-y: auto;" class="mb-3">
+                    {% for prefix, folder in config.folder_mappings.items() %}
+                        <div class="d-flex justify-content-between align-items-center border-bottom py-2" id="mapping-{{ prefix }}">
+                            <div>
+                                <strong>{{ prefix }}</strong> → {{ folder }}
+                            </div>
+                            <button class="btn btn-sm btn-danger" onclick="deleteFolderMapping('{{ prefix }}')">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h6>Add New Mapping</h6>
+                        <div class="mb-2">
+                            <input type="text" class="form-control form-control-sm" id="newPrefix" placeholder="Prefix (e.g., FOX6)">
+                        </div>
+                        <div class="mb-2">
+                            <input type="text" class="form-control form-control-sm" id="newFolder" placeholder="Folder (e.g., FOX 6)">
+                        </div>
+                        <button class="btn btn-success btn-sm w-100" onclick="addFolderMapping()">
+                            <i class="bi bi-plus-circle"></i> Add Mapping
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Directories Configuration -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-warning">
+                <h5 class="mb-0"><i class="bi bi-hdd"></i> Directory Paths</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Configure the paths used by the importer.</p>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label"><strong>Import Folder</strong></label>
+                        <input type="text" class="form-control" id="dir_import_folder" value="{{ config.directories.import_folder }}">
+                        <small class="form-text text-muted">Where files are uploaded and monitored</small>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label"><strong>Archive Folder</strong></label>
+                        <input type="text" class="form-control" id="dir_archive_folder" value="{{ config.directories.archive_folder }}">
+                        <small class="form-text text-muted">Where processed files are archived</small>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label"><strong>Final Destination Root</strong></label>
+                        <input type="text" class="form-control" id="dir_final_destination_root" value="{{ config.directories.final_destination_root }}">
+                        <small class="form-text text-muted">Root folder for station directories</small>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label"><strong>Log Folder</strong></label>
+                        <input type="text" class="form-control" id="dir_log_folder" value="{{ config.directories.log_folder }}">
+                        <small class="form-text text-muted">Where log files are stored</small>
+                    </div>
+                </div>
+
+                <button class="btn btn-success" onclick="saveDirectories()">
+                    <i class="bi bi-save"></i> Save Directories
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-3">
+    <div class="col-12">
+        <a href="{{ url_for('index') }}" class="btn btn-outline-light">
+            <i class="bi bi-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentFileTypes = {{ config.allowed_file_types|tojson }};
+
+function addFileType() {
+    const input = document.getElementById('newFileType');
+    const fileType = input.value.trim().toUpperCase();
+
+    if (!fileType) {
+        alert('Please enter a file type');
+        return;
+    }
+
+    if (fileType.length < 2 || fileType.length > 4) {
+        alert('File type must be 2-4 characters');
+        return;
+    }
+
+    if (!/^[A-Z0-9]+$/.test(fileType)) {
+        alert('File type must contain only letters and numbers');
+        return;
+    }
+
+    if (currentFileTypes.includes(fileType)) {
+        alert('File type already exists');
+        return;
+    }
+
+    currentFileTypes.push(fileType);
+    updateFileTypesList();
+    input.value = '';
+}
+
+function removeFileType(fileType) {
+    currentFileTypes = currentFileTypes.filter(ft => ft !== fileType);
+    updateFileTypesList();
+}
+
+function updateFileTypesList() {
+    const container = document.getElementById('fileTypesList');
+    container.innerHTML = currentFileTypes.map(ft => `
+        <div class="badge bg-primary me-2 mb-2 fs-6 p-2">
+            .${ft}
+            <button type="button" class="btn-close btn-close-white ms-2" style="font-size: 0.6rem;" onclick="removeFileType('${ft}')"></button>
+        </div>
+    `).join('');
+}
+
+function saveFileTypes() {
+    fetch('/api/file_types', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({file_types: currentFileTypes})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('File types saved successfully!');
+            location.reload();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => alert('Error saving file types: ' + error));
+}
+
+function addFolderMapping() {
+    const prefix = document.getElementById('newPrefix').value.trim();
+    const folder = document.getElementById('newFolder').value.trim();
+
+    if (!prefix || !folder) {
+        alert('Please enter both prefix and folder');
+        return;
+    }
+
+    fetch('/api/folder_mappings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({prefix, folder})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => alert('Error adding mapping: ' + error));
+}
+
+function deleteFolderMapping(prefix) {
+    if (!confirm(`Delete mapping for "${prefix}"?`)) return;
+
+    fetch('/api/folder_mappings', {
+        method: 'DELETE',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({prefix})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('mapping-' + prefix).remove();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => alert('Error deleting mapping: ' + error));
+}
+
+function saveDirectories() {
+    const directories = ['import_folder', 'archive_folder', 'final_destination_root', 'log_folder'];
+    let saved = 0;
+
+    directories.forEach(dir => {
+        const path = document.getElementById('dir_' + dir).value.trim();
+        if (!path) return;
+
+        fetch('/api/directories', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({type: dir, path})
+        })
+        .then(response => response.json())
+        .then(data => {
+            saved++;
+            if (saved === directories.length) {
+                alert('Directories saved successfully!');
+                location.reload();
+            }
+        })
+        .catch(error => console.error('Error saving directory:', error));
+    });
+}
+</script>
+{% endblock %}

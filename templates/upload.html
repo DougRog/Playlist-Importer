@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Files - Playlist Importer{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="text-white"><i class="bi bi-cloud-upload"></i> Upload Playlist Files</h1>
+        <p class="text-white-50">Upload {{ config.allowed_file_types|join(', ') }} files to the import folder</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="card">
+            <div class="card-body p-5">
+                <form method="POST" enctype="multipart/form-data" id="uploadForm">
+                    <div class="mb-4">
+                        <label for="fileInput" class="form-label">Select Files</label>
+                        <input class="form-control form-control-lg" type="file" id="fileInput" name="files[]" multiple required>
+                        <div class="form-text">
+                            Allowed types:
+                            {% for file_type in config.allowed_file_types %}
+                                <span class="badge bg-secondary">.{{ file_type }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div id="fileList" class="mb-4"></div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-cloud-upload"></i> Upload Files
+                        </button>
+                        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Back to Dashboard
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-info-circle"></i> Upload Information</h5>
+                <ul class="mb-0">
+                    <li>Files will be placed in: <code>{{ config.directories.import_folder }}</code></li>
+                    <li>Only files with allowed extensions will be accepted</li>
+                    <li>Files will be automatically processed by the importer service</li>
+                    <li>You can upload multiple files at once</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('fileInput').addEventListener('change', function(e) {
+    const fileList = document.getElementById('fileList');
+    const files = e.target.files;
+    const allowedTypes = {{ config.allowed_file_types|tojson }};
+
+    if (files.length > 0) {
+        let html = '<div class="alert alert-info"><strong>Selected Files:</strong><ul class="mb-0 mt-2">';
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const ext = file.name.split('.').pop().toUpperCase();
+            const isAllowed = allowedTypes.includes(ext);
+            const iconClass = isAllowed ? 'text-success bi-check-circle' : 'text-danger bi-x-circle';
+
+            html += `<li><i class="bi ${iconClass}"></i> ${file.name} (${(file.size / 1024).toFixed(2)} KB)</li>`;
+        }
+
+        html += '</ul></div>';
+        fileList.innerHTML = html;
+    } else {
+        fileList.innerHTML = '';
+    }
+});
+</script>
+{% endblock %}

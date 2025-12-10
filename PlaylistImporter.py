@@ -2,46 +2,66 @@ import os
 import shutil
 import time
 import smtplib
+import json
 from email.message import EmailMessage
 from datetime import datetime
 
-# Directories
-import_folder = '/mnt/playlists/Import'
-archive_folder = '/mnt/playlists/Archive'
-final_destination_root = '/mnt/playlists'
-log_folder = '/home/lilly/Logs'
+# Configuration file path
+CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'config.json')
 
-# Email settings
-EMAIL_TO = 'drogers@lillybroadcasting.com'
-EMAIL_FROM = 'mib@lillyhubtv.com'
-EMAIL_PASSWORD = 'N0t1fy!@!'
-SMTP_SERVER = 'smtp-legacy.office365.com'
-SMTP_PORT = 587
+# Global configuration variables
+config = {}
+import_folder = None
+archive_folder = None
+final_destination_root = None
+log_folder = None
+log_file = None
+EMAIL_TO = None
+EMAIL_FROM = None
+EMAIL_PASSWORD = None
+SMTP_SERVER = None
+SMTP_PORT = None
+folder_map = {}
+allowed_file_types = []
 
-# Ensure log folder exists
-os.makedirs(log_folder, exist_ok=True)
-log_file = os.path.join(log_folder, f'PlaylistImporter-{datetime.now():%Y-%m-%d}.txt')
+def load_config():
+    """Load configuration from config.json file"""
+    global config, import_folder, archive_folder, final_destination_root, log_folder
+    global log_file, EMAIL_TO, EMAIL_FROM, EMAIL_PASSWORD, SMTP_SERVER, SMTP_PORT
+    global folder_map, allowed_file_types
 
-# Mapping filename prefixes to folders
-folder_map = {
-    "FOX6": "FOX 6",
-    "WENY": "WENY ABC",
-    "ABC7": "ABC 7",
-    "EENY": "WENY CBS",
-    "SEE": "SEE CBS",
-    "WCVI": "WCVI CBS",
-    "EZMQ": "WZMQ CBS",
-    "WSEE": "WSEE CBS",
-    "WICU": "WICU NBC",
-    "OCTV": "OCTV",
-    "ENNPLUS": "ENN+",
-    "ECVI": "WCVI ABC",
-    "WSJP": "WSJP FOX",
-    "WVXF": "WVXF FOX",
-    "WVGN": "WVGN NBC",
-    "GENY": "WENY CW",
-    "NYLOCAL": "NY Local"
-}
+    try:
+        with open(CONFIG_FILE, 'r') as f:
+            config = json.load(f)
+
+        # Load directories
+        import_folder = config['directories']['import_folder']
+        archive_folder = config['directories']['archive_folder']
+        final_destination_root = config['directories']['final_destination_root']
+        log_folder = config['directories']['log_folder']
+
+        # Load email settings
+        EMAIL_TO = config['email']['to']
+        EMAIL_FROM = config['email']['from']
+        EMAIL_PASSWORD = config['email']['password']
+        SMTP_SERVER = config['email']['smtp_server']
+        SMTP_PORT = config['email']['smtp_port']
+
+        # Load folder mappings and allowed file types
+        folder_map = config['folder_mappings']
+        allowed_file_types = [ft.upper() for ft in config['allowed_file_types']]
+
+        # Ensure log folder exists
+        os.makedirs(log_folder, exist_ok=True)
+        log_file = os.path.join(log_folder, f'PlaylistImporter-{datetime.now():%Y-%m-%d}.txt')
+
+        return True
+    except Exception as e:
+        print(f"Error loading configuration: {e}")
+        return False
+
+# Load initial configuration
+load_config()
 
 def log(message):
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -74,6 +94,9 @@ def is_stable_file(file_path, delay=30):
 def move_files():
     while True:
         try:
+            # Reload configuration on each iteration
+            load_config()
+
             imported_files = []
             deleted_files = []
 
@@ -83,18 +106,19 @@ def move_files():
                 if not os.path.isfile(file_path):
                     continue
 
-                # Handle non-WOS files
-                if not file_name.lower().endswith('.wos'):
+                # Handle files not matching allowed types
+                file_ext = os.path.splitext(file_name)[1][1:].upper()  # Get extension without dot
+                if file_ext not in allowed_file_types:
                     try:
                         os.remove(file_path)
-                        msg = f"Deleted non-WOS file: {file_path}"
+                        msg = f"Deleted non-allowed file type: {file_path}"
                         log(msg)
                         deleted_files.append(msg)
                     except Exception as e:
-                        log(f"Failed to delete non-WOS file {file_path}: {e}")
+                        log(f"Failed to delete non-allowed file {file_path}: {e}")
                     continue
 
-                # Skip unstable WOS files
+                # Skip unstable files
                 if not is_stable_file(file_path):
                     log(f"Skipping {file_name}, file not stable yet")
                     continue
@@ -109,7 +133,8 @@ def move_files():
                             final_path = os.path.join(final_folder_path, file_name)
 
                             timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-                            archive_name = f"{os.path.splitext(file_name)[0]}_{timestamp}.WOS"
+                            file_base, file_extension = os.path.splitext(file_name)
+                            archive_name = f"{file_base}_{timestamp}{file_extension}"
                             archive_path = os.path.join(archive_folder, archive_name)
 
                             shutil.copy2(file_path, archive_path)
@@ -128,17 +153,17 @@ def move_files():
                 if not matched:
                     try:
                         os.remove(file_path)
-                        msg = f"Deleted unmapped WOS file: {file_path}"
+                        msg = f"Deleted unmapped playlist file: {file_path}"
                         log(msg)
                         deleted_files.append(msg)
                     except Exception as e:
-                        log(f"Failed to delete unmapped WOS file {file_path}: {e}")
+                        log(f"Failed to delete unmapped playlist file {file_path}: {e}")
 
             # Send combined email notifications
             if imported_files:
                 send_email(
                     "Playlist Imports Completed",
-                    "The following WOS files were imported:\n\n" + "\n\n".join(imported_files)
+                    "The following playlist files were imported:\n\n" + "\n\n".join(imported_files)
                 )
 
             if deleted_files:
@@ -152,5 +177,5 @@ def move_files():
         time.sleep(60)
 
 if __name__ == "__main__":
-    log("Monitoring for .WOS files")
+    log(f"Monitoring for playlist files: {', '.join(allowed_file_types)}")
     move_files()

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}{{ filename }} - Playlist Importer{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="text-white"><i class="bi bi-file-text"></i> {{ filename }}</h1>
+        <p class="text-white-50">Log file contents</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="mb-3">
+                    <a href="{{ url_for('view_logs') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to Logs
+                    </a>
+                </div>
+
+                <div style="background: #f8f9fa; border-radius: 5px; padding: 1rem; max-height: 600px; overflow-y: auto;">
+                    <pre class="mb-0" style="white-space: pre-wrap; word-wrap: break-word;">{{ content }}</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
